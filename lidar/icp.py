@@ -33,3 +33,43 @@ def icp_point_to_point(src, tgt, T_init=None, max_iter=50, max_dist=1.0, tol=1e-
         if abs(dT - np.eye(4)).max() < tol:  # correction is tiny -> converged
             break
     return T, it + 1, d[keep].mean()
+
+
+def skew(w):
+    # w x v == skew(w) @ v
+    return np.array([[0, -w[2], w[1]],
+                     [w[2], 0, -w[0]],
+                     [-w[1], w[0], 0]])
+
+
+def exp_so3(w):
+    # rotation vector -> rotation matrix (Rodrigues formula)
+    th = np.linalg.norm(w)
+    if th < 1e-12:
+        return np.eye(3)
+    K = skew(w / th)
+    return np.eye(3) + np.sin(th) * K + (1 - np.cos(th)) * K @ K
+
+
+def icp_point_to_plane(src, tgt, tgt_normals, T_init=None, max_iter=50, max_dist=1.0, tol=1e-6):
+    tree = cKDTree(tgt)
+    T = np.eye(4) if T_init is None else T_init.copy()
+    for it in range(max_iter):
+        moved = apply_T(T, src)
+        d, idx = tree.query(moved)
+        keep = d < max_dist
+        if keep.sum() < 10:
+            break
+        p = moved[keep]
+        q = tgt[idx[keep]]
+        n = tgt_normals[idx[keep]]
+
+        A = np.hstack([np.cross(p, n), n])      # N x 6, one row a_i per pair
+        b = np.sum(n * (p - q), axis=1)         # N, distance of each p to its plane
+        x = np.linalg.solve(A.T @ A, -A.T @ b)  # 6 numbers: [w, t]
+
+        dT = make_T(exp_so3(x[:3]), x[3:])
+        T = dT @ T
+        if abs(x).max() < tol:
+            break
+    return T, it + 1, d[keep].mean()
