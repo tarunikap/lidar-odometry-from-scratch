@@ -1,6 +1,6 @@
 #!/bin/bash
 # scores every method against gps with evo
-for m in p2p p2plane gicp; do
+for m in p2p p2plane gicp kiss_nodeskew kiss; do
   echo "===== $m ====="
   echo -n "ATE unaligned (m): "; evo_ape kitti results/gt.txt results/$m.txt | grep rmse
   echo -n "ATE aligned   (m): "; evo_ape kitti results/gt.txt results/$m.txt -a | grep rmse
