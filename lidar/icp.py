@@ -73,3 +73,22 @@ def icp_point_to_plane(src, tgt, tgt_normals, T_init=None, max_iter=50, max_dist
         if abs(x).max() < tol:
             break
     return T, it + 1, d[keep].mean()
+
+
+import open3d as o3d
+
+
+def icp_gicp(src, tgt, T_init=None, max_dist=1.0, max_iter=50):
+    # generalized icp from open3d. it builds a covariance "pancake" for every point in both clouds
+    s = o3d.geometry.PointCloud()
+    s.points = o3d.utility.Vector3dVector(src)
+    t = o3d.geometry.PointCloud()
+    t.points = o3d.utility.Vector3dVector(tgt)
+    T0 = np.eye(4) if T_init is None else T_init
+    reg = o3d.pipelines.registration
+    res = reg.registration_generalized_icp(
+        s, t, max_dist, T0,
+        reg.TransformationEstimationForGeneralizedICP(),
+        reg.ICPConvergenceCriteria(max_iteration=max_iter))
+    # open3d doesn't report the iteration count, so return None for it
+    return res.transformation.copy(), None, res.inlier_rmse
